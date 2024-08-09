@@ -1,0 +1,3 @@
+@extract <bc-umi{@barcode}><bc-umi[12]>
+tag                    id       distances   maxFindsG   locations
+3M-february-2018.txt$  barcode  1           1           0,0,16
