@@ -24,8 +24,9 @@ To convert `.tsv` file of barcodes to input type for `fgbio`'s `fqtk` processing
 
 ### 10x3V3 Data
 ```
-wget -P ./10xV3/data -c ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR105/009/SRR10587809/SRR10587809_1.fastq.gz
-wget -P ./10xV3/data -c ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR105/009/SRR10587809/SRR10587809_2.fastq.gz
+wget -P 10x3v3/data -c \
+    ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR105/009/SRR10587809/SRR10587809_1.fastq.gz \
+    ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR105/009/SRR10587809/SRR10587809_2.fastq.gz
 ```
 
 ### sci-RNA-seq3 Data
@@ -33,6 +34,13 @@ wget -P ./10xV3/data -c ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR105/009/SRR1058780
 wget -P sci-rna-seq3/data \
     ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR782/006/SRR7827206/SRR7827206_1.fastq.gz \
     ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR782/006/SRR7827206/SRR7827206_2.fastq.gz
+```
+
+### SPLiTseq Data
+```
+wget -P splitseq/data -c \
+    ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR675/002/SRR6750042/SRR6750042_1.fastq.gz \
+    ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR675/002/SRR6750042/SRR6750042_2.fastq.gz
 ```
 
 ### Usage

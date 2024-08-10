@@ -6,6 +6,7 @@ use std::{
 
 static SPLITCODE_SCI_RNA_SEQ_CONFIG: &str = "./sci-rna-seq3/sci-rna-seq3-config.txt";
 static FQTK_DEMUX_10X_METADATA: &str = "./10x3v3/10x-barcodes-metadata.tsv";
+static SPLITCODE_SPLITSEQ_SUB_CONFIG: &str = "./splitseq/splitseq-rt-bc.txt";
 
 /// Process single-cell sequencing protocols with specific programs.
 #[derive(Parser, Debug)]
@@ -84,7 +85,12 @@ impl Program {
         }
     }
 
-    fn exec(&self, protocol: Protocol, r1: std::path::PathBuf, r2: std::path::PathBuf) -> Child {
+    fn exec(
+        &self,
+        protocol: Protocol,
+        r1: std::path::PathBuf,
+        r2: std::path::PathBuf,
+    ) -> Child {
         let mut command = Command::new("gtime");
         command.arg("-v");
 
@@ -111,7 +117,16 @@ impl Program {
                     .arg(r2)
                     .spawn()
                     .expect("Failed splitcode processing on sci-RNA-seq3 data"),
-                Protocol::SPLiTseq => todo!(),
+                Protocol::SPLiTseq => command
+                    .arg("splitcode")
+                    .arg("-c")
+                    .arg(SPLITCODE_SPLITSEQ_SUB_CONFIG)
+                    .arg("-nFastqs=1")
+                    .arg("-n 4")
+                    .arg("--x-only")
+                    .arg(r2)
+                    .spawn()
+                    .expect("Failed splitcode processing on SPLiTseq data bc map"),
             },
             Program::Fgbio => match protocol {
                 Protocol::TenX => command
