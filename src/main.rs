@@ -8,6 +8,8 @@ static SPLITCODE_SCI_RNA_SEQ_CONFIG: &str = "./sci-rna-seq3/sci-rna-seq3-config.
 static FQTK_DEMUX_10X_METADATA: &str = "./10x3v3/10x-barcodes-metadata.tsv";
 static SPLITCODE_SPLITSEQ_SUB_CONFIG: &str = "./splitseq/splitseq-rt-bc.txt";
 
+static MAX_NUM_READS: &str = "800000000";
+
 /// Process single-cell sequencing protocols with specific programs.
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -85,12 +87,7 @@ impl Program {
         }
     }
 
-    fn exec(
-        &self,
-        protocol: Protocol,
-        r1: std::path::PathBuf,
-        r2: std::path::PathBuf,
-    ) -> Child {
+    fn exec(&self, protocol: Protocol, r1: std::path::PathBuf, r2: std::path::PathBuf) -> Child {
         let mut command = Command::new("gtime");
         command.arg("-v");
 
@@ -99,7 +96,7 @@ impl Program {
             Program::Splitcode => match protocol {
                 Protocol::TenX => command
                     .arg("splitcode")
-                    .arg("-x 0:0<10x-barcode-umi>0:16,0:16<10x-barcode-umi>0:28")
+                    .args(["-x", "0:0<10x-barcode-umi>0:16,0:16<10x-barcode-umi>0:28"])
                     .arg("--x-only")
                     .arg("-nFastqs=2")
                     .arg(r1)
@@ -111,7 +108,7 @@ impl Program {
                     .arg("-c")
                     .arg(SPLITCODE_SCI_RNA_SEQ_CONFIG)
                     .arg("-nFastqs=2")
-                    .arg("-n 30000")
+                    .args(["-n", MAX_NUM_READS])
                     .arg("--x-only")
                     .arg(r1)
                     .arg(r2)
@@ -122,7 +119,7 @@ impl Program {
                     .arg("-c")
                     .arg(SPLITCODE_SPLITSEQ_SUB_CONFIG)
                     .arg("-nFastqs=1")
-                    .arg("-n 4")
+                    .args(["-n", MAX_NUM_READS])
                     .arg("--x-only")
                     .arg(r2)
                     .spawn()
@@ -165,7 +162,7 @@ fn main() {
     clean_up();
 }
 
-fn fgbio_10x() {
+pub fn fgbio_10x() {
     let r1 = std::path::PathBuf::from("10x3v3/data/10x-r1.fastq");
     let r2 = std::path::PathBuf::from("10x3v3/data/10x-r2.fastq");
 
@@ -175,7 +172,7 @@ fn fgbio_10x() {
     clean_up();
 }
 
-fn splitcode_10x() {
+pub fn splitcode_10x() {
     let r1 = std::path::PathBuf::from("10x3v3/data/10x-r1.fastq");
     let r2 = std::path::PathBuf::from("10x3v3/data/10x-r2.fastq");
 
@@ -185,11 +182,21 @@ fn splitcode_10x() {
     clean_up();
 }
 
-fn splitcode_sci_rna_seq3() {
+pub fn splitcode_sci_rna_seq3() {
     let r1 = std::path::PathBuf::from("sci-rna-seq3/data/SRR7827206_1_head.fastq");
     let r2 = std::path::PathBuf::from("sci-rna-seq3/data/SRR7827206_2_head.fastq");
 
     let mut output = Program::Splitcode.exec(Protocol::SciRNASeq3, r1, r2);
+    let _ = output.wait();
+
+    clean_up();
+}
+
+pub fn splitcode_splitseq() {
+    let r1 = std::path::PathBuf::from("splitseq/data/SPLiT-seq-r1.fastq");
+    let r2 = std::path::PathBuf::from("splitseq/data/SPLiT-seq-r1.fastq");
+
+    let mut output = Program::Splitcode.exec(Protocol::SPLiTseq, r1, r2);
     let _ = output.wait();
 
     clean_up();
