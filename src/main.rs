@@ -172,9 +172,9 @@ pub fn fgbio_10x() {
     clean_up();
 }
 
-pub fn splitcode_10x() {
-    let r1 = std::path::PathBuf::from("10x3v3/data/10x-r1.fastq");
-    let r2 = std::path::PathBuf::from("10x3v3/data/10x-r2.fastq");
+pub fn splitcode_10x(r1: &str, r2: &str) {
+    let r1 = std::path::PathBuf::from(r1);
+    let r2 = std::path::PathBuf::from(r2);
 
     let mut output = Program::Splitcode.exec(Protocol::TenX, r1, r2);
     let _ = output.wait();
@@ -182,9 +182,9 @@ pub fn splitcode_10x() {
     clean_up();
 }
 
-pub fn splitcode_sci_rna_seq3() {
-    let r1 = std::path::PathBuf::from("sci-rna-seq3/data/SRR7827206_1_head.fastq");
-    let r2 = std::path::PathBuf::from("sci-rna-seq3/data/SRR7827206_2_head.fastq");
+pub fn splitcode_sci_rna_seq3(r1: &str, r2: &str) {
+    let r1 = std::path::PathBuf::from(r1);
+    let r2 = std::path::PathBuf::from(r2);
 
     let mut output = Program::Splitcode.exec(Protocol::SciRNASeq3, r1, r2);
     let _ = output.wait();
@@ -192,9 +192,9 @@ pub fn splitcode_sci_rna_seq3() {
     clean_up();
 }
 
-pub fn splitcode_splitseq() {
-    let r1 = std::path::PathBuf::from("splitseq/data/SPLiT-seq-r1.fastq");
-    let r2 = std::path::PathBuf::from("splitseq/data/SPLiT-seq-r1.fastq");
+pub fn splitcode_splitseq(r1: &str, r2: &str) {
+    let r1 = std::path::PathBuf::from(r1);
+    let r2 = std::path::PathBuf::from(r2);
 
     let mut output = Program::Splitcode.exec(Protocol::SPLiTseq, r1, r2);
     let _ = output.wait();
