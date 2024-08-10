@@ -3,6 +3,7 @@
 *.sh
 *output/
 *.fastq
+*.gz
 
 out.txt
 

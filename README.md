@@ -20,7 +20,7 @@ while read line; do
 done <./10x3v3/data/10x-barcodes.txt
 ```
 
-To convert `.txt` file of barcodes to input type for `fgbio`'s `fqtk` processing method.
+To convert `.tsv` file of barcodes to input type for `fgbio`'s `fqtk` processing method.
 
 ### 10x3V3 Data
 ```
@@ -36,6 +36,8 @@ wget -P sci-rna-seq3/data \
 ```
 
 ### Usage
+
+By default `gtime -v` is set on and should print usage the stdout.
 
 ```
 $ cargo run -- -h

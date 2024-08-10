@@ -1,5 +1,8 @@
 use clap::Parser;
-use std::process::{Child, Command};
+use std::{
+    os::unix::process::CommandExt,
+    process::{Child, Command},
+};
 
 static SPLITCODE_SCI_RNA_SEQ_CONFIG: &str = "./sci-rna-seq3/sci-rna-seq3-config.txt";
 static FQTK_DEMUX_10X_METADATA: &str = "./10x3v3/10x-barcodes-metadata.tsv";
@@ -112,14 +115,13 @@ impl Program {
             },
             Program::Fgbio => match protocol {
                 Protocol::TenX => command
-                    .arg("fqtk")
-                    .arg("demux")
+                    .args(["fqtk", "demux"])
                     .arg("--inputs")
                     .arg(r1)
                     .arg(r2)
-                    .args(["16B12M", "+T"])
-                    .arg("--sample-metadata")
-                    .arg(FQTK_DEMUX_10X_METADATA)
+                    .args(["--read-structures", "16B12M", "+T"])
+                    .args(["--sample-metadata", FQTK_DEMUX_10X_METADATA])
+                    .args(["--output", "out"])
                     .spawn()
                     .expect("Failed fqtk processing on 10x data"),
                 Protocol::SciRNASeq3 => {
@@ -144,4 +146,42 @@ fn main() {
 
     let mut output = program.exec(protocol, args.r1, args.r2);
     let _ = output.wait();
+
+    clean_up();
+}
+
+fn fgbio_10x() {
+    let r1 = std::path::PathBuf::from("10x3v3/data/10x-r1.fastq");
+    let r2 = std::path::PathBuf::from("10x3v3/data/10x-r2.fastq");
+
+    let mut output = Program::Fgbio.exec(Protocol::TenX, r1, r2);
+    let _ = output.wait();
+
+    clean_up();
+}
+
+fn splitcode_10x() {
+    let r1 = std::path::PathBuf::from("10x3v3/data/10x-r1.fastq");
+    let r2 = std::path::PathBuf::from("10x3v3/data/10x-r2.fastq");
+
+    let mut output = Program::Splitcode.exec(Protocol::TenX, r1, r2);
+    let _ = output.wait();
+
+    clean_up();
+}
+
+fn splitcode_sci_rna_seq3() {
+    let r1 = std::path::PathBuf::from("sci-rna-seq3/data/SRR7827206_1_head.fastq");
+    let r2 = std::path::PathBuf::from("sci-rna-seq3/data/SRR7827206_2_head.fastq");
+
+    let mut output = Program::Splitcode.exec(Protocol::SciRNASeq3, r1, r2);
+    let _ = output.wait();
+
+    clean_up();
+}
+
+fn clean_up() {
+    if std::path::Path::new("out").exists() {
+        Command::new("rm").arg("-r").arg("out").exec();
+    }
 }
