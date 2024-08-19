@@ -1,0 +1,6 @@
+bc_1 = map(b[8], $0, remove(self))
+bc_2 = b[8]
+bc_3 = b[8]
+umi = u[10]
+1{r:}2{<bc_1>x[30]<bc_2>x[30]<bc_3><umi>}
+->1{<bc_1><bc_2><bc_3><umi>}

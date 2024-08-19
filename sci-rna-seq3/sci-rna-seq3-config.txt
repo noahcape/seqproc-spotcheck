@@ -1,5 +1,5 @@
-@extract <sci-rna-seq3-chained[9-10]>{{anchor}}
-@extract {{anchor}}8<sci-rna-seq3-chained[10]>
-@extract {{anchor}}<sci-rna-seq3-chained[8]>
+@extract <splitcode_sci_rna_seq3[9-10]>{{anchor}}
+@extract {{anchor}}8<splitcode_sci_rna_seq3[10]>
+@extract {{anchor}}<splitcode_sci_rna_seq3[8]>
 group       tag         distance	next		maxFindsG	location
 anchor      CAGAGC      1           -           1           0:9:16

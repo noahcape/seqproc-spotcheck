@@ -1,4 +1,7 @@
-@extract 0:0<bc-bc-bc-umi>0:8,0:38<bc-bc-bc-umi>0:46,<bc-bc-bc-umi{#*}>,0:84<bc-bc-bc-umi>0:94
+@extract 0:0<splitcode_splitseq>0:8
+@extract 0:38<splitcode_splitseq>0:46
+@extract <splitcode_splitseq{#*}>
+@extract 0:84<splitcode_splitseq>0:94
 tags	subs	distances	locations
 CATCATCC	CATTCCTA	1	0,76,84
 CTGCTTTG	CTTCATCA	1	0,76,84

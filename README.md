@@ -1,6 +1,10 @@
 # seqproc-spotcheck
 Spotchecking single-cell sequencing methods
 
+### Running seqproc
+
+Since `seqproc` is unpublished make sure to change `SEQPROC_PATH` in `main.rs` to the path where the `seqproc` binary is.
+
 ### 10x3v3 Barcodes
 ```
 wget -P 10x3v3/data wget https://teichlab.github.io/scg_lib_structs/data/10X-Genomics/3M-february-2018.txt.gz

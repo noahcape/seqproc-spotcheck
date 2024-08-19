@@ -1,0 +1,6 @@
+brc_1 = b[9-10]
+anchor = hamming(f[CAGAGC], 1)
+umi = u[8]
+brc_2 = b[10] 
+1{<brc_1><anchor><umi><brc_2>}2{r:}
+-> 1{<brc_1><brc_2><umi>}
