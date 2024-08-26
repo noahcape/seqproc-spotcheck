@@ -1,18 +1,20 @@
 use bio::io::fastq::{self, FastqRead, Record};
 use clap::Parser;
+use read_structure::ReadStructure;
+use std::time::Instant;
 use std::{
     fs::File,
     io::{Error, Write},
     os::unix::process::CommandExt,
     path::PathBuf,
     process::{Child, Command},
+    str::FromStr,
 };
 
 /// CHANGE THIS
 static SEQPROC_PATH: &str = "../seqproc/target/release/seqproc";
 
 static SPLITCODE_SCI_RNA_SEQ_CONFIG: &str = "./sci-rna-seq3/sci-rna-seq3-config.txt";
-static FQTK_DEMUX_10X_METADATA: &str = "./10x3v3/10x-barcodes-metadata.tsv";
 static SPLITCODE_SPLITSEQ_SUB_CONFIG: &str = "./splitseq/splitseq-rt-bc.txt";
 static SEQPROC_10X_EFGDL: &str = "./10x3v3/10x3v3.efgdl";
 static SEQPROC_SCI_RNA_SEQ3_EFGDL: &str = "./sci-rna-seq3/sci-rna-seq3.efgdl";
@@ -126,7 +128,7 @@ impl Program {
                 Protocol::SPLiTseq => "splitcode_splitseq.fastq",
             },
             Program::Fgbio => match protocol {
-                Protocol::TenX => todo!(),
+                Protocol::TenX => "./10x3v3/read_structures_out/read_structures_10x3v3.fastq",
                 Protocol::SciRNASeq3 => todo!(),
                 Protocol::SPLiTseq => todo!(),
             },
@@ -136,6 +138,10 @@ impl Program {
                 Protocol::SPLiTseq => todo!(),
             },
         }
+    }
+
+    fn clean_up(&self, protocol: &Protocol) -> Result<(), Error> {
+        std::fs::remove_file(self.out_file(protocol))
     }
 
     fn parse_record_id<'a>(&self, id: &'a str) -> &'a str {
@@ -226,16 +232,25 @@ impl Program {
                     .expect("Failed splitcode processing on SPLiTseq data bc map"),
             },
             Program::Fgbio => match protocol {
-                Protocol::TenX => command
-                    .args(["fqtk", "demux"])
-                    .arg("--inputs")
-                    .arg(r1)
-                    .arg(r2)
-                    .args(["--read-structures", "16B12M", "+T"])
-                    .args(["--sample-metadata", FQTK_DEMUX_10X_METADATA])
-                    .args(["--output", "out"])
-                    .spawn()
-                    .expect("Failed fqtk processing on 10x data"),
+                Protocol::TenX => {
+                    let now = Instant::now();
+
+                    {
+                        let left_rs = ReadStructure::from_str("16B12M").unwrap();
+                        let right_rs = ReadStructure::from_str("+T").unwrap();
+
+                        read_validate_write_records(r1, self.out_file(protocol), left_rs);
+                        read_validate_write_records(r2, "/dev/null", right_rs);
+                    }
+
+                    let elapsed = now.elapsed();
+                    println!("Elapsed: {:.2?}", elapsed);
+
+                    command
+                        .args(["echo", "completed"])
+                        .spawn()
+                        .expect("Failed read-structure")
+                }
                 Protocol::SciRNASeq3 => {
                     panic!("fgbio fqtk cannot support the sci-rna-seq3 protocol")
                 }
@@ -275,6 +290,14 @@ fn as_path_buf(_str: &str) -> PathBuf {
 #[cfg(test)]
 mod seqproc_tests {
     use super::*;
+
+    #[test]
+    fn read_structures() {
+        let r1 = "./10x3v3/data/SRR10587809_1_head.fastq";
+        let r2 = "./10x3v3/data/SRR10587809_2_head.fastq";
+
+        compare_programs(Program::Seqproc, Program::Fgbio, Protocol::TenX, r1, r2)
+    }
 
     #[test]
     fn sci_rna_seq3() {
@@ -379,4 +402,26 @@ fn write_fastqs(outf: &mut File, records: Vec<Record>) -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+fn read_validate_write_records(from: &PathBuf, to: &str, rs: ReadStructure) {
+    let mut reader = fastq::Reader::new(File::open(from).expect("Could not open fastq"));
+    let mut record = fastq::Record::new();
+    let mut writer = fastq::Writer::new(File::create(to).expect("Could not open fastq"));
+
+    reader.read(&mut record).expect("Failed to parse record");
+    while !record.is_empty() {
+        if let Ok(()) = record.check() {
+            let segments = rs.segments();
+            if segments.len() == 2 {
+                writer
+                    .write_record(&record)
+                    .expect("Failed to write record")
+            };
+        };
+
+        reader
+            .read(&mut record)
+            .expect("Failed to read next record");
+    }
 }
