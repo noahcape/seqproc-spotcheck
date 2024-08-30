@@ -52,6 +52,10 @@ struct Cli {
     /// path to r2 file (.fastq/.fasta)
     #[arg(short = '2', long = "r2")]
     r2: std::path::PathBuf,
+
+    /// number of times to repeat processing
+    #[arg(short = 'r', long = "repeat", default_value_t = 1)]
+    repeat: usize,
 }
 
 enum Protocol {
@@ -337,8 +341,18 @@ impl Program {
                         read_validate_write_records(r2, "/dev/null", right_rs);
                     }
 
+                    let mut time_file = PathBuf::from(self.time_file(protocol));
+                    time_file.set_file_name("out.txt");
+
+                    let mut out = OpenOptions::new()
+                        .append(true)
+                        .create(true)
+                        .open(time_file)
+                        .expect("Failed to open file");
+
                     let elapsed = now.elapsed();
-                    println!("Elapsed: {:.2?}", elapsed);
+                    out.write_all(format!("{:?}\n", elapsed.as_millis()).as_bytes())
+                        .expect("Failed to write");
                 }
                 Protocol::SciRNASeq3 => {
                     panic!("fgbio fqtk cannot support the sci-rna-seq3 protocol")
@@ -368,7 +382,9 @@ fn main() {
         panic!("Program doesn't support that protocol.")
     }
 
-    program.exec(&protocol, &args.r1, &args.r2);
+    for _ in 0..=args.repeat {
+        program.exec(&protocol, &args.r1, &args.r2);
+    }
 
     clean_up();
 }
