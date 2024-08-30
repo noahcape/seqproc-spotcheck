@@ -9,3 +9,4 @@ out.txt
 
 10x3v3/10x-barcodes-metadata.tsv
 10x3v3/10x-barcodes.txt
+*.txt

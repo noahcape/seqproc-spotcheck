@@ -1,13 +1,11 @@
-use bio::io::fastq::{self, FastqRead, Record};
+use bio::io::fastq::{self, FastqRead};
 use clap::Parser;
 use read_structure::ReadStructure;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::time::Instant;
 use std::{
-    fs::File,
-    io::{Error, Write},
-    os::unix::process::CommandExt,
-    path::PathBuf,
-    process::{Child, Command},
+    fs::File, io::Error, os::unix::process::CommandExt, path::PathBuf, process::Command,
     str::FromStr,
 };
 
@@ -62,6 +60,7 @@ enum Protocol {
     SPLiTseq,
 }
 
+#[allow(dead_code)]
 impl Protocol {
     fn from(num: usize) -> Self {
         match num {
@@ -81,7 +80,7 @@ impl Protocol {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Program {
     Seqproc,
     Splitcode,
@@ -140,10 +139,87 @@ impl Program {
         }
     }
 
+    fn time_file(&self, protocol: &Protocol) -> &str {
+        match self {
+            Program::Seqproc => match protocol {
+                Protocol::TenX => "./10x3v3/seqproc_out/out.txt",
+                Protocol::SciRNASeq3 => "./sci-rna-seq3/seqproc_out/out.txt",
+                Protocol::SPLiTseq => "./splitseq/seqproc_out/out.txt",
+            },
+            Program::Splitcode => match protocol {
+                Protocol::TenX => "./10x3v3/splitcode_out/out.txt",
+                Protocol::SciRNASeq3 => "./sci-rna-seq3/splitcode_out/out.txt",
+                Protocol::SPLiTseq => "./splitseq/splitcode_out/out.txt",
+            },
+            Program::Fgbio => match protocol {
+                Protocol::TenX => "./10x3v3/read_structures_out/out.txt",
+                Protocol::SciRNASeq3 => todo!(),
+                Protocol::SPLiTseq => todo!(),
+            },
+            Program::Flexiplex => match protocol {
+                Protocol::TenX => todo!(),
+                Protocol::SciRNASeq3 => todo!(),
+                Protocol::SPLiTseq => todo!(),
+            },
+        }
+    }
+
+    fn time(&self, protocol: &Protocol) {
+        let file_path = self.time_file(protocol);
+
+        if !PathBuf::from(file_path).exists() {
+            return;
+        }
+
+        // x.xxuser x.xxsystem x:xx.xelsapsed x%CPU (xavgtext+xavgdata xmaxresident)k
+        // xinputs+xoutputs (xmajor+xminor)pagefaults xswaps
+        let file_contents =
+            fs::read_to_string(file_path).expect("Failed to read executation statistics");
+
+        let contents = file_contents
+            .split('\n')
+            .flat_map(|s| s.split(' '))
+            .collect::<Vec<_>>();
+
+        let wall_time = contents[2]
+            .as_bytes()
+            .iter()
+            .filter(|c| !c.is_ascii_alphabetic())
+            .copied()
+            .collect::<Vec<_>>();
+
+        if contents.is_empty() || wall_time.is_empty() {
+            return;
+        }
+
+        let page_size = contents[5]
+            .as_bytes()
+            .iter()
+            .filter(|c| !c.is_ascii_alphabetic() && **c != b')')
+            .copied()
+            .collect::<Vec<_>>();
+
+        let mut alt_path = PathBuf::from(file_path);
+        alt_path.set_file_name("final_timed.txt");
+
+        let mut out = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(alt_path)
+            .expect("Unable to open final time file.");
+
+        out.write_all(&wall_time).expect("Failed to write");
+        out.write_all(&[b'\n']).expect("Failed to write");
+        out.write_all(&page_size).expect("Failed to write");
+        out.write_all(&[b'\n']).expect("Failed to write");
+    }
+
+    #[allow(dead_code)]
     fn clean_up(&self, protocol: &Protocol) -> Result<(), Error> {
         std::fs::remove_file(self.out_file(protocol))
     }
 
+    #[allow(dead_code)]
     fn parse_record_id<'a>(&self, id: &'a str) -> &'a str {
         match self {
             Program::Seqproc => id.split(' ').collect::<Vec<_>>().first().unwrap(),
@@ -153,83 +229,101 @@ impl Program {
         }
     }
 
-    fn exec(&self, protocol: &Protocol, r1: &std::path::PathBuf, r2: &std::path::PathBuf) -> Child {
+    fn exec(&self, protocol: &Protocol, r1: &std::path::PathBuf, r2: &std::path::PathBuf) {
         let mut command = Command::new("gtime");
-        command.arg("-v");
+        command.args(["-o", self.time_file(protocol)]);
 
         match self {
             Program::Seqproc => match protocol {
-                Protocol::TenX => command
-                    .arg(SEQPROC_PATH)
-                    .args(["-g", SEQPROC_10X_EFGDL])
-                    .arg("-1")
-                    .arg(r1)
-                    .arg("-2")
-                    .arg(r2)
-                    .args(["-o", self.out_file(protocol)])
-                    .args(["-t", "6"])
-                    .spawn()
-                    .expect("Failed seqproc processing on 10x data"),
-                Protocol::SciRNASeq3 => command
-                    .arg(SEQPROC_PATH)
-                    .args(["-g", SEQPROC_SCI_RNA_SEQ3_EFGDL])
-                    .arg("-1")
-                    .arg(r1)
-                    .arg("-2")
-                    .arg(r2)
-                    .args(["-o", self.out_file(protocol)])
-                    .args(["-t", "6"])
-                    .spawn()
-                    .expect("Failed seqproc processing on sci-rna-seq3 data"),
-                Protocol::SPLiTseq => command
-                    .arg(SEQPROC_PATH)
-                    .args(["-g", SEQPROC_SPLITSEQ_EFGDL])
-                    .arg("-1")
-                    .arg(r1)
-                    .arg("-2")
-                    .arg(r2)
-                    .args(["-o", self.out_file(protocol)])
-                    .args(["-t", "6"])
-                    .args(["-a", SEQPROC_SPLITSEQ_MAPPING])
-                    .spawn()
-                    .expect("Failed seqproc processing on splitseq data"),
+                Protocol::TenX => {
+                    let _ = command
+                        .arg(SEQPROC_PATH)
+                        .args(["-g", SEQPROC_10X_EFGDL])
+                        .arg("-1")
+                        .arg(r1)
+                        .arg("-2")
+                        .arg(r2)
+                        .args(["-o", self.out_file(protocol)])
+                        .args(["-t", "6"])
+                        .spawn()
+                        .expect("Failed seqproc processing on 10x data")
+                        .wait();
+                }
+                Protocol::SciRNASeq3 => {
+                    let _ = command
+                        .arg(SEQPROC_PATH)
+                        .args(["-g", SEQPROC_SCI_RNA_SEQ3_EFGDL])
+                        .arg("-1")
+                        .arg(r1)
+                        .arg("-2")
+                        .arg(r2)
+                        .args(["-o", self.out_file(protocol)])
+                        .args(["-t", "6"])
+                        .spawn()
+                        .expect("Failed seqproc processing on sci-rna-seq3 data")
+                        .wait();
+                }
+                Protocol::SPLiTseq => {
+                    let _ = command
+                        .arg(SEQPROC_PATH)
+                        .args(["-g", SEQPROC_SPLITSEQ_EFGDL])
+                        .arg("-1")
+                        .arg(r1)
+                        .arg("-2")
+                        .arg(r2)
+                        .args(["-o", self.out_file(protocol)])
+                        .args(["-t", "6"])
+                        .args(["-a", SEQPROC_SPLITSEQ_MAPPING])
+                        .spawn()
+                        .expect("Failed seqproc processing on splitseq data")
+                        .wait();
+                }
             },
             Program::Splitcode => match protocol {
-                Protocol::TenX => command
-                    .arg("splitcode")
-                    .args(["-x", "0:0<splitcode_10x3v3>0:16,0:16<splitcode_10x3v3>0:28"])
-                    .arg("--x-only")
-                    .arg("-nFastqs=2")
-                    .args(["-n", MAX_NUM_READS])
-                    .args(["-t", "6"])
-                    .arg(r1)
-                    .arg(r2)
-                    .spawn()
-                    .expect("Failed splitcode processing on 10x data"),
-                Protocol::SciRNASeq3 => command
-                    .arg("splitcode")
-                    .arg("-c")
-                    .arg(SPLITCODE_SCI_RNA_SEQ_CONFIG)
-                    .arg("--x-only")
-                    .arg("-nFastqs=2")
-                    .args(["-n", MAX_NUM_READS])
-                    .args(["-t", "6"])
-                    .arg(r1)
-                    .arg(r2)
-                    .spawn()
-                    .expect("Failed splitcode processing on sci-RNA-seq3 data"),
-                Protocol::SPLiTseq => command
-                    .arg("splitcode")
-                    .arg("-c")
-                    .arg(SPLITCODE_SPLITSEQ_SUB_CONFIG)
-                    .arg("-nFastqs=2")
-                    .args(["-n", MAX_NUM_READS])
-                    .arg("--x-only")
-                    .args(["-t", "6"])
-                    .arg(r1)
-                    .arg(r2)
-                    .spawn()
-                    .expect("Failed splitcode processing on SPLiTseq data bc map"),
+                Protocol::TenX => {
+                    let _ = command
+                        .arg("splitcode")
+                        .args(["-x", "0:0<splitcode_10x3v3>0:16,0:16<splitcode_10x3v3>0:28"])
+                        .arg("--x-only")
+                        .arg("-nFastqs=2")
+                        .args(["-n", MAX_NUM_READS])
+                        .args(["-t", "6"])
+                        .arg(r1)
+                        .arg(r2)
+                        .spawn()
+                        .expect("Failed splitcode processing on 10x data")
+                        .wait();
+                }
+                Protocol::SciRNASeq3 => {
+                    let _ = command
+                        .arg("splitcode")
+                        .arg("-c")
+                        .arg(SPLITCODE_SCI_RNA_SEQ_CONFIG)
+                        .arg("--x-only")
+                        .arg("-nFastqs=2")
+                        .args(["-n", MAX_NUM_READS])
+                        .args(["-t", "6"])
+                        .arg(r1)
+                        .arg(r2)
+                        .spawn()
+                        .expect("Failed splitcode processing on sci-RNA-seq3 data")
+                        .wait();
+                }
+                Protocol::SPLiTseq => {
+                    let _ = command
+                        .arg("splitcode")
+                        .arg("-c")
+                        .arg(SPLITCODE_SPLITSEQ_SUB_CONFIG)
+                        .arg("-nFastqs=2")
+                        .args(["-n", MAX_NUM_READS])
+                        .arg("--x-only")
+                        .args(["-t", "6"])
+                        .arg(r1)
+                        .arg(r2)
+                        .spawn()
+                        .expect("Failed splitcode processing on SPLiTseq data bc map")
+                        .wait();
+                }
             },
             Program::Fgbio => match protocol {
                 Protocol::TenX => {
@@ -245,11 +339,6 @@ impl Program {
 
                     let elapsed = now.elapsed();
                     println!("Elapsed: {:.2?}", elapsed);
-
-                    command
-                        .args(["echo", "completed"])
-                        .spawn()
-                        .expect("Failed read-structure")
                 }
                 Protocol::SciRNASeq3 => {
                     panic!("fgbio fqtk cannot support the sci-rna-seq3 protocol")
@@ -258,6 +347,14 @@ impl Program {
             },
             Program::Flexiplex => todo!(),
         }
+
+        match self {
+            Program::Splitcode | Program::Seqproc => {
+                println!("{:?}", self);
+                self.time(protocol);
+            }
+            _ => (),
+        };
     }
 }
 
@@ -271,8 +368,7 @@ fn main() {
         panic!("Program doesn't support that protocol.")
     }
 
-    let mut output = program.exec(&protocol, &args.r1, &args.r2);
-    let _ = output.wait();
+    program.exec(&protocol, &args.r1, &args.r2);
 
     clean_up();
 }
@@ -283,13 +379,15 @@ fn clean_up() {
     }
 }
 
-fn as_path_buf(_str: &str) -> PathBuf {
-    std::path::PathBuf::from(_str)
-}
-
 #[cfg(test)]
 mod seqproc_tests {
     use super::*;
+    use bio::io::fastq::Record;
+    use std::io::Write;
+
+    fn as_path_buf(_str: &str) -> PathBuf {
+        std::path::PathBuf::from(_str)
+    }
 
     #[test]
     fn read_structures() {
@@ -334,74 +432,72 @@ mod seqproc_tests {
             r2,
         )
     }
-}
 
-fn compare_programs(prog1: Program, prog2: Program, protocol: Protocol, r1: &str, r2: &str) {
-    let r1 = as_path_buf(r1);
-    let r2 = as_path_buf(r2);
+    fn compare_programs(prog1: Program, prog2: Program, protocol: Protocol, r1: &str, r2: &str) {
+        let r1 = as_path_buf(r1);
+        let r2 = as_path_buf(r2);
 
-    let mut out1 = prog1.exec(&protocol, &r1, &r2);
-    let _ = out1.wait();
-    let outf1 = prog1.out_file(&protocol);
+        let _ = prog1.exec(&protocol, &r1, &r2);
+        let outf1 = prog1.out_file(&protocol);
 
-    let mut out2 = prog2.exec(&protocol, &r1, &r2);
-    let _ = out2.wait();
-    let outf2 = prog2.out_file(&protocol);
+        let _ = prog2.exec(&protocol, &r1, &r2);
+        let outf2 = prog2.out_file(&protocol);
 
-    compare_fastq(outf1, outf2);
-}
-
-fn compare_fastq(fastq1: &str, fastq2: &str) {
-    let fastq1_file = File::open(fastq1).expect("Could not open fastq");
-    let fastq2_file = File::open(fastq2).expect("Could not open fastq");
-
-    let fastq1_records = records(fastq1_file);
-    let fastq2_records = records(fastq2_file);
-
-    assert_eq!(fastq1_records.len(), fastq2_records.len())
-}
-
-fn records(fastq: File) -> Vec<Record> {
-    // create FASTQ reader
-    let mut reader = fastq::Reader::new(fastq);
-    let mut record = fastq::Record::new();
-    let mut records: Vec<Record> = vec![];
-
-    reader.read(&mut record).expect("Failed to parse record");
-    while !record.is_empty() {
-        let check = record.check();
-        if check.is_ok() {
-            records.push(record.clone());
-        }
-
-        let mut res = reader.read(&mut record);
-        while res.is_err() {
-            res = reader.read(&mut record);
-        }
-        res.unwrap();
+        compare_fastq(outf1, outf2);
     }
 
-    records
-}
+    fn compare_fastq(fastq1: &str, fastq2: &str) {
+        let fastq1_file = File::open(fastq1).expect("Could not open fastq");
+        let fastq2_file = File::open(fastq2).expect("Could not open fastq");
 
-fn write_fastqs(outf: &mut File, records: Vec<Record>) -> Result<(), Error> {
-    for record in records {
-        let qual = record.qual();
-        let id = record.id();
-        let seq = record.seq();
-        let res = write!(
-            outf,
-            "{id}\n{s}\n+\n{q}\n",
-            s = String::from_utf8(seq.to_vec()).unwrap(),
-            q = String::from_utf8(qual.to_vec()).unwrap()
-        );
+        let fastq1_records = records(fastq1_file);
+        let fastq2_records = records(fastq2_file);
 
-        if res.is_err() {
-            return Err(res.err().unwrap());
-        }
+        assert_eq!(fastq1_records.len(), fastq2_records.len())
     }
 
-    Ok(())
+    fn records(fastq: File) -> Vec<Record> {
+        // create FASTQ reader
+        let mut reader = fastq::Reader::new(fastq);
+        let mut record = fastq::Record::new();
+        let mut records: Vec<Record> = vec![];
+
+        reader.read(&mut record).expect("Failed to parse record");
+        while !record.is_empty() {
+            let check = record.check();
+            if check.is_ok() {
+                records.push(record.clone());
+            }
+
+            let mut res = reader.read(&mut record);
+            while res.is_err() {
+                res = reader.read(&mut record);
+            }
+            res.unwrap();
+        }
+
+        records
+    }
+
+    fn write_fastqs(outf: &mut File, records: Vec<Record>) -> Result<(), Error> {
+        for record in records {
+            let qual = record.qual();
+            let id = record.id();
+            let seq = record.seq();
+            let res = write!(
+                outf,
+                "{id}\n{s}\n+\n{q}\n",
+                s = String::from_utf8(seq.to_vec()).unwrap(),
+                q = String::from_utf8(qual.to_vec()).unwrap()
+            );
+
+            if res.is_err() {
+                return Err(res.err().unwrap());
+            }
+        }
+
+        Ok(())
+    }
 }
 
 fn read_validate_write_records(from: &PathBuf, to: &str, rs: ReadStructure) {
