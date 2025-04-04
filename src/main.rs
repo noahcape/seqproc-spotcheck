@@ -11,6 +11,7 @@ use std::{
 
 /// CHANGE THIS
 static SEQPROC_PATH: &str = "../seqproc/target/release/seqproc";
+static SPLITCODE_PATH: &str = "../splitcode/build/src/splitcode";
 
 static SPLITCODE_SCI_RNA_SEQ_CONFIG: &str = "./sci-rna-seq3/sci-rna-seq3-config.txt";
 static SPLITCODE_SPLITSEQ_SUB_CONFIG: &str = "./splitseq/splitseq-rt-bc.txt";
@@ -19,7 +20,10 @@ static SEQPROC_SCI_RNA_SEQ3_EFGDL: &str = "./sci-rna-seq3/sci-rna-seq3.efgdl";
 static SEQPROC_SPLITSEQ_EFGDL: &str = "./splitseq/splitseq.efgdl";
 static SEQPROC_SPLITSEQ_MAPPING: &str = "./splitseq/bc_mapping.tsv";
 
-static MAX_NUM_READS: &str = "800000000";
+// static MAX_NUM_READS: &str = "800000000";
+static SHORT_NUM_READS: &str = "200000";
+static LONG_10X_NUM_READS: &str = "212763129";
+static LONG_SCI_NUM_READS: &str = "19410854";
 
 // splitcode + sci-rna-seq3
 // cargo run -- --program 2 --protocol 2 --r1 ./sci-rna-seq3/data/SRR7827206_1_head.fastq --r2 ./sci-rna-seq3/data/SRR7827206_2_head.fastq
@@ -57,6 +61,7 @@ struct Cli {
     #[arg(short = 'r', long = "repeat", default_value_t = 1)]
     repeat: usize,
 }
+
 
 enum Protocol {
     TenX,
@@ -212,9 +217,11 @@ impl Program {
             .open(alt_path)
             .expect("Unable to open final time file.");
 
+        out.write_all(&format!("{}\n", protocol.name()).as_bytes()).expect("Failed to write");
         out.write_all(&wall_time).expect("Failed to write");
         out.write_all(&[b'\n']).expect("Failed to write");
         out.write_all(&page_size).expect("Failed to write");
+        out.write_all(&[b'\n']).expect("Failed to write");
         out.write_all(&[b'\n']).expect("Failed to write");
     }
 
@@ -234,7 +241,7 @@ impl Program {
     }
 
     fn exec(&self, protocol: &Protocol, r1: &std::path::PathBuf, r2: &std::path::PathBuf) {
-        let mut command = Command::new("gtime");
+        let mut command = Command::new("time");
         command.args(["-o", self.time_file(protocol)]);
 
         match self {
@@ -286,11 +293,11 @@ impl Program {
             Program::Splitcode => match protocol {
                 Protocol::TenX => {
                     let _ = command
-                        .arg("splitcode")
+                        .arg(SPLITCODE_PATH)
                         .args(["-x", "0:0<splitcode_10x3v3>0:16,0:16<splitcode_10x3v3>0:28"])
                         .arg("--x-only")
                         .arg("-nFastqs=2")
-                        .args(["-n", MAX_NUM_READS])
+                        .args(["-n", LONG_10X_NUM_READS])
                         .args(["-t", "6"])
                         .arg(r1)
                         .arg(r2)
@@ -300,12 +307,12 @@ impl Program {
                 }
                 Protocol::SciRNASeq3 => {
                     let _ = command
-                        .arg("splitcode")
+                        .arg(SPLITCODE_PATH)
                         .arg("-c")
                         .arg(SPLITCODE_SCI_RNA_SEQ_CONFIG)
                         .arg("--x-only")
                         .arg("-nFastqs=2")
-                        .args(["-n", MAX_NUM_READS])
+                        .args(["-n", LONG_SCI_NUM_READS])
                         .args(["-t", "6"])
                         .arg(r1)
                         .arg(r2)
@@ -315,11 +322,11 @@ impl Program {
                 }
                 Protocol::SPLiTseq => {
                     let _ = command
-                        .arg("splitcode")
+                        .arg(SPLITCODE_PATH)
                         .arg("-c")
                         .arg(SPLITCODE_SPLITSEQ_SUB_CONFIG)
                         .arg("-nFastqs=2")
-                        .args(["-n", MAX_NUM_READS])
+                        .args(["-n", SHORT_NUM_READS])
                         .arg("--x-only")
                         .args(["-t", "6"])
                         .arg(r1)
@@ -382,7 +389,7 @@ fn main() {
         panic!("Program doesn't support that protocol.")
     }
 
-    for _ in 0..=args.repeat {
+    for _ in 1..=args.repeat {
         program.exec(&protocol, &args.r1, &args.r2);
     }
 
@@ -391,7 +398,7 @@ fn main() {
 
 fn clean_up() {
     if std::path::Path::new("out").exists() {
-        Command::new("rm").arg("-r").arg("out").exec();
+        let _ = Command::new("rm").arg("-r").arg("out").exec();
     }
 }
 

@@ -2,11 +2,20 @@
 
 *.sh
 *output/
-*.fastq
+*/data/*.fastq
 *.gz
+
+# all splitcode and read structures
+splitcode*
+read_structures*
 
 out.txt
 
 10x3v3/10x-barcodes-metadata.tsv
 10x3v3/10x-barcodes.txt
 *.txt
+
+#log and run files
+*.log
+*.run
+*.run~
